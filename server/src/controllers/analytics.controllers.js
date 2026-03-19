@@ -1,4 +1,4 @@
-// server/src/controllers/analytics.controller.js
+// src/controllers/analytics.controller.js
 import Job from '../models/Job.model.js';
 
 export async function getAnalytics(req, res, next) {
@@ -16,9 +16,12 @@ export async function getAnalytics(req, res, next) {
             ]),
         ]);
 
-        const topCompany = byCompany[0] || null;
-
-        res.json({ total, newCount, topCompany, byCompany });
+        res.json({
+            total,
+            newCount,
+            topCompany: byCompany[0] || null,
+            byCompany,
+        });
     } catch (err) {
         next(err);
     }

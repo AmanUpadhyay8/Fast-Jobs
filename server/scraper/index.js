@@ -1,29 +1,36 @@
 // server/scraper/index.js  ← GitHub Actions runs this file directly
+// scraper/index.js
 import 'dotenv/config';
 import mongoose from 'mongoose';
 import { fetchJobsForConfig } from './scraper.service.js';
 import { upsertJobs } from './dedup.js';
 import ScraperConfig from '../src/models/ScraperConfig.model.js';
-import Company from '../src/models/Company.model.js';
 
 async function run() {
+    console.log('Scraper started:', new Date().toISOString());
+
     await mongoose.connect(process.env.MONGO_URI);
     console.log('Connected to MongoDB');
 
-    const [configs, companies] = await Promise.all([
-        ScraperConfig.find({ isActive: true }),
-        Company.find({ isActive: true }),
-    ]);
+    const configs = await ScraperConfig.find({ isActive: true });
+
+    if (configs.length === 0) {
+        console.log('No active scraper configs found. Add one to the scraper-configs collection.');
+        await mongoose.disconnect();
+        process.exit(0);
+    }
 
     for (const config of configs) {
-        console.log(`Running config: ${config.keywords.join(', ')}`);
+        console.log(`\nRunning config: keywords=[${config.keywords.join(', ')}]`);
         const jobs = await fetchJobsForConfig(config);
-        const result = await upsertJobs(jobs, companies);
-        console.log(`  inserted=${result.inserted} skipped=${result.skipped} dropped=${result.dropped}`);
+        console.log(`Total fetched: ${jobs.length}`);
+
+        const result = await upsertJobs(jobs);
+        console.log(`inserted=${result.inserted} | skipped=${result.skipped} | dropped=${result.dropped}`);
     }
 
     await mongoose.disconnect();
-    console.log('Done');
+    console.log('\nScraper finished.');
     process.exit(0);
 }
 

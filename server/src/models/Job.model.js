@@ -14,8 +14,10 @@ const JobSchema = new mongoose.Schema({
     source: { type: String },               // "linkedin", "indeed", "JSearch will show other portals as well"
     postedAt: { type: Date, required: true },
     fetchedAt: { type: Date, default: Date.now },
-    isNew: { type: Boolean, default: false }, // postedAt within 12h of fetchedAt
+    isRecent: { type: Boolean, default: false }, // postedAt within 12h of fetchedAt
     tags: [String],
+    city: { type: String },
+    isRemote: { type: Boolean },
 }, { timestamps: true });
 
 // Auto-delete jobs older than 7 days

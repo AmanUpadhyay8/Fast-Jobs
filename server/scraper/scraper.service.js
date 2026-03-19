@@ -1,4 +1,4 @@
-// server/scraper/scraper.service.js
+// scraper/scraper.service.js
 import axios from 'axios';
 
 const BASE_URL = 'https://jsearch.p.rapidapi.com/search';
@@ -17,14 +17,15 @@ export async function fetchJobsForConfig(config) {
     for (const keyword of config.keywords) {
         for (const level of config.levels) {
             try {
+                console.log(`  Fetching: "${keyword}" | level: ${level}`);
+
                 const { data } = await axios.get(BASE_URL, {
                     params: {
-                        query: keyword,
+                        query: `${keyword}`,
                         page: '1',
                         num_pages: '2',
-                        employment_type: 'FULLTIME,INTERN',
-                        job_requirements: LEVEL_MAP[level] || 'mid_level',
                         date_posted: 'today',
+                        country: 'IN',
                     },
                     headers: {
                         'X-RapidAPI-Key': process.env.JSEARCH_API_KEY,
@@ -38,15 +39,24 @@ export async function fetchJobsForConfig(config) {
                     role: job.job_title,
                     level,
                     applyUrl: job.job_apply_link,
-                    source: job.job_publisher?.toLowerCase() || 'unknown',
-                    postedAt: new Date(job.job_posted_at_timestamp * 1000),
+                    source: job.job_publisher?.toLowerCase().trim() || 'unknown',
+                    postedAt: job.job_posted_at_timestamp
+                        ? new Date(job.job_posted_at_timestamp * 1000)
+                        : new Date(),
                     tags: job.job_required_skills || [],
+                    city: job.job_city || null,
+                    isRemote: job.job_is_remote ?? false,
                 }));
 
+                console.log(`    Found ${jobs.length} jobs`);
                 results.push(...jobs);
+
+                // Small delay between requests to avoid rate limiting
+                await new Promise(r => setTimeout(r, 500));
+
             } catch (err) {
-                console.error(`Failed for keyword="${keyword}" level="${level}":`, err.message);
-                // Don't rethrow — one failed combination shouldn't kill the whole run
+                console.error(`  Failed "${keyword}" / ${level}:`, err.response?.data?.message || err.message);
+                // Don't rethrow — one failed combo shouldn't kill the whole run
             }
         }
     }
