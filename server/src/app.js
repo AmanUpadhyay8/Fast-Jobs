@@ -9,6 +9,8 @@ import { rateLimiter } from './middleware/rateLimiter.js';
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: process.env.CLIENT_URL }));
 app.use(express.json());
 app.use(rateLimiter);
