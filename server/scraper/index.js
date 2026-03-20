@@ -1,8 +1,7 @@
-// server/scraper/index.js  ← GitHub Actions runs this file directly
 // scraper/index.js
 import 'dotenv/config';
 import mongoose from 'mongoose';
-import { fetchJobsForConfig } from './scraper.service.js';
+import { scrapeWebJobs } from './scraper.worker.js';
 import { upsertJobs } from './dedup.js';
 import ScraperConfig from '../src/models/ScraperConfig.model.js';
 
@@ -12,25 +11,28 @@ async function run() {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('Connected to MongoDB');
 
-    const configs = await ScraperConfig.find({ isActive: true });
+    const config = await ScraperConfig.findOne({ isActive: true });
 
-    if (configs.length === 0) {
-        console.log('No active scraper configs found. Add one to the scraper-configs collection.');
+    if (!config) {
+        console.log('No active scraper config found. Run seed.js first.');
         await mongoose.disconnect();
         process.exit(0);
     }
 
-    for (const config of configs) {
-        console.log(`\nRunning config: keywords=[${config.keywords.join(', ')}]`);
-        const jobs = await fetchJobsForConfig(config);
-        console.log(`Total fetched: ${jobs.length}`);
+    // Pull maxPages and maxAgeDays from MongoDB — change these in Atlas anytime
+    const maxPages = config.webScraper?.maxPages ?? 2;
+    const maxAgeDays = config.webScraper?.maxAgeDays ?? 1;
 
-        const result = await upsertJobs(jobs);
-        console.log(`inserted=${result.inserted} | skipped=${result.skipped} | dropped=${result.dropped}`);
-    }
+    console.log(`\nWeb scraper config: maxPages=${maxPages}, maxAgeDays=${maxAgeDays}`);
+
+    const webJobs = await scrapeWebJobs({ maxPages, maxAgeDays });
+    console.log(`Total fetched: ${webJobs.length}`);
+
+    const result = await upsertJobs(webJobs);
+    console.log(`inserted=${result.inserted} | skipped=${result.skipped} | dropped=${result.dropped}`);
 
     await mongoose.disconnect();
-    console.log('\nScraper finished.');
+    console.log('\nScraper finished:', new Date().toISOString());
     process.exit(0);
 }
 
